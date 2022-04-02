@@ -1,6 +1,5 @@
 package server;
 
-import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.json.JSONObject;
@@ -26,8 +25,6 @@ final public class Server {
 
     /**
      * Точка входа в программу
-     *
-     * @param args
      */
     public static void main(String[] args) {
         Server server = new Server("8080");
@@ -45,19 +42,8 @@ final public class Server {
             e.printStackTrace();
         }
 
-        Objects.requireNonNull(httpServer).createContext("/api/messages/create", new MyHandler());
-        httpServer.createContext("/api/messages/get", new MyTestHandler());
-        httpServer.setExecutor(null); // по умолчанию один поток
-        httpServer.start();
-        System.out.println("Server started on port " + Integer.parseInt(serverPort));
-    }
-
-    /**
-     * Класс описывающий обработку http запроса для маршрута /api/messages/create
-     */
-    final public static class MyHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange httpExchange) {
+        //Обработчик создания сообщения (маршрут /api/messages/create)
+        HttpHandler handlerOfCreatingMessage = (httpExchange) -> {
             InputStream inputStream = httpExchange.getRequestBody();
             String request = null;
             try {
@@ -84,15 +70,10 @@ final public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
-    }
+        };
 
-    /**
-     * Класс описывающий обработку http запроса для маршрута /api/messages/get
-     */
-    final public static class MyTestHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange httpExchange) {
+        //Обработчик получения сообщения (маршрут /api/messages/get)
+        HttpHandler handlerOfGettingMessage = (httpExchange) -> {
             String response = "This is the server response";
             System.out.println(response);
 
@@ -102,6 +83,13 @@ final public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+        };
+
+        //Передача обработчиков в методы createContext() для каждого из маршрутов
+        Objects.requireNonNull(httpServer).createContext("/api/messages/create", handlerOfCreatingMessage);
+        httpServer.createContext("/api/messages/get", handlerOfGettingMessage);
+        httpServer.setExecutor(null); // по умолчанию один поток
+        httpServer.start();
+        System.out.println("Server started on port " + Integer.parseInt(serverPort));
     }
 }

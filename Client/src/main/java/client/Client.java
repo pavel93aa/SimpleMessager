@@ -31,8 +31,6 @@ final public class Client {
 
     /**
      * Точка входа в программу
-     *
-     * @param args
      */
     public static void main(String[] args) {
         Client client = new Client("http", "192.168.0.154", "8080");
@@ -96,7 +94,7 @@ final public class Client {
         try (BufferedReader bufferedReader = new BufferedReader(
                 new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder response = new StringBuilder();
-            String responseLine = null;
+            String responseLine;
             while ((responseLine = bufferedReader.readLine()) != null) {
                 response.append(responseLine.trim());
             }
