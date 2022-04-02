@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Scanner;
 
 /**
@@ -36,6 +39,9 @@ final public class Client {
         client.start();
     }
 
+    /**
+     * Ввод текста сообщения
+     */
     public void start() {
         Scanner scanner = new Scanner(System.in);
         System.out.print("Введите автора: ");
@@ -47,32 +53,54 @@ final public class Client {
         }
     }
 
+    /**
+     * Отправка сообщения
+     *
+     * @param text текст сообщения
+     */
     private void sendMessage(final String text) {
         Message message = new Message(this.author, text);
         JSONObject jsonObject = new JSONObject(message);
+        byte[] input = jsonObject.toString().getBytes(StandardCharsets.UTF_8);
+
+        URL url = null;
+        try {
+            url = new URL(serverSchema + "://" + serverIP + ":" + serverPort + "/api/messages/create");
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        HttpURLConnection httpURLConnection = null;
+        try {
+            httpURLConnection = (HttpURLConnection) Objects.requireNonNull(url).openConnection();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         try {
-            URL url = new URL(serverSchema + "://" + serverIP + ":" + serverPort + "/api/messages/create");
+            Objects.requireNonNull(httpURLConnection).setRequestMethod("POST");
+        } catch (ProtocolException e) {
+            e.printStackTrace();
+        }
 
-            HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-            httpURLConnection.setRequestMethod("POST");
-            httpURLConnection.setRequestProperty("Content-Type", "application/json; utf-8");
-            httpURLConnection.setDoOutput(true);
+        Objects.requireNonNull(httpURLConnection).setRequestProperty("Content-Type", "application/json; utf-8");
+        httpURLConnection.setDoOutput(true);
 
-            try (OutputStream outputStream = httpURLConnection.getOutputStream()) {
-                byte[] input = jsonObject.toString().getBytes(StandardCharsets.UTF_8);
-                outputStream.write(input, 0, input.length);
+        //Запись в поток OutputStream отправляемого сообщения
+        try (OutputStream outputStream = httpURLConnection.getOutputStream()) {
+            outputStream.write(input, 0, input.length);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try (BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
+            StringBuilder response = new StringBuilder();
+            String responseLine = null;
+            while ((responseLine = bufferedReader.readLine()) != null) {
+                response.append(responseLine.trim());
             }
-
-            try (BufferedReader bufferedReader = new BufferedReader(
-                    new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String responseLine = null;
-                while ((responseLine = bufferedReader.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                System.out.println(response);
-            }
+            System.out.println(response);
         } catch (IOException e) {
             e.printStackTrace();
         }
