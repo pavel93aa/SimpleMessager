@@ -2,25 +2,67 @@ package server;
 
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Класс содержащий метод запуска сервера
  */
 final public class Server {
     private final String serverPort;
+
     private static final List<Message> messages = new ArrayList<>();
     private static int idCounter;
 
     public Server(String serverPort) {
         this.serverPort = serverPort;
+    }
+
+    /**
+     * Сохранение значений параметров key и value полученного клиентского запроса в отображение
+     *
+     * @param query строка формата key1=value1&keyN=valueN
+     * @return отображение со значениями параметров полученного клиентского запроса
+     */
+    private static Map<String, String> queryToMap(String query) {
+        if (query == null) return null;
+        Map<String, String> resultMap = new HashMap<>();
+        for (String param : query.split("&")) {
+            String[] entry = param.split("=");
+            if (entry.length > 1) resultMap.put(entry[0], entry[1]);
+            else resultMap.put(entry[0], "");
+        }
+        return resultMap;
+    }
+
+    /**
+     * Валидация и извлечение переданного клиентом параметра
+     *
+     * @param map переданные параметры пользователя в запросе
+     * @return id сообщения отправленного клиентом, после которого будут возвращены все сообщения
+     */
+    private static Integer extractMessageId(Map<String, String> map) {
+        // Проверка что ключ message_id есть
+        if (!map.containsKey("message_id")) return null;
+
+        // Нужна проверка, что параметр message_id должен быть только один в теле запроса
+
+        // Проверка, что тип целое число
+        int messageId;
+        try {
+            messageId = Integer.parseInt(map.get("message_id"));
+        } catch (NumberFormatException e) {
+            System.out.println("Значение параметра message_id - не число");
+            return null;
+        }
+
+        // Проверка, что число положительное
+        if (messageId < 0) return null;
+        return messageId;
     }
 
     /**
@@ -42,7 +84,7 @@ final public class Server {
             e.printStackTrace();
         }
 
-        //Обработчик создания сообщения (маршрут /api/messages/create)
+        // Обработчик создания сообщения (маршрут /api/messages/create)
         HttpHandler handlerOfCreatingMessage = (httpExchange) -> {
             InputStream inputStream = httpExchange.getRequestBody();
             String request = null;
@@ -52,12 +94,12 @@ final public class Server {
                 e.printStackTrace();
             }
 
-            //Здесь было бы неплохо прикрутить валидацию полученного сообщения на соответствие json-формату
+            // Здесь было бы неплохо прикрутить валидацию полученного сообщения на соответствие json-формату
 
-            JSONObject jsonObject = new JSONObject(request);
+            JSONObject jsonObject = new JSONObject(Objects.requireNonNull(request));
             Message message = new Message(jsonObject, ++idCounter, new Date());
 
-            //Добавление объекта Message в список
+            // Добавление объекта Message в список
             messages.add(message);
 
             jsonObject = new JSONObject(message);
@@ -72,23 +114,47 @@ final public class Server {
             }
         };
 
-        //Обработчик получения сообщения (маршрут /api/messages/get)
+        // Обработчик получения сообщения (маршрут /api/messages/get)
         HttpHandler handlerOfGettingMessage = (httpExchange) -> {
-            String response = "This is the server response";
-            System.out.println(response);
+
+            // Преобразование параметра запроса клиента в отображение
+            Map<String, String> params = Server.queryToMap(httpExchange.getRequestURI().getQuery());
+            System.out.println(params);
+
+            // Получение messageID из отображения
+            Integer messageId = Server.extractMessageId(params);
+
+            String response;
+            int statusCode = 200;
+
+            if (messageId == null) {
+                response = "Ошибка";
+                statusCode = 400;
+            } else {
+                List<Message> newMessages = new ArrayList<>();
+
+                // Получение всех сообщений, id которых больше чем значение параметра message_id
+                for (Message message : messages) {
+                    if (messageId < message.getId()) newMessages.add(message);
+                }
+
+                JSONArray jsonArray = new JSONArray(newMessages);
+                System.out.println(jsonArray);
+                response = jsonArray.toString();
+            }
 
             try (OutputStream outputStream = httpExchange.getResponseBody()) {
-                httpExchange.sendResponseHeaders(200, response.getBytes().length);
+                httpExchange.sendResponseHeaders(statusCode, response.getBytes().length);
                 outputStream.write(response.getBytes());
             } catch (IOException e) {
                 e.printStackTrace();
             }
         };
 
-        //Передача обработчиков в методы createContext() для каждого из маршрутов
+        // Передача обработчиков в методы createContext() для каждого из маршрутов
         Objects.requireNonNull(httpServer).createContext("/api/messages/create", handlerOfCreatingMessage);
         httpServer.createContext("/api/messages/get", handlerOfGettingMessage);
-        httpServer.setExecutor(null); // по умолчанию один поток
+        httpServer.setExecutor(null); // По умолчанию один поток
         httpServer.start();
         System.out.println("Server started on port " + Integer.parseInt(serverPort));
     }
