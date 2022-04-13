@@ -1,6 +1,7 @@
 package client;
 
-import org.json.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,8 +23,9 @@ final public class Client {
     private final String serverIP;
     private final String serverPort;
     private String author;
+    private int maxMessageId;
 
-    public Client(String serverSchema, String serverIP, String serverPort) {
+    private Client(String serverSchema, String serverIP, String serverPort) {
         this.serverSchema = serverSchema;
         this.serverIP = serverIP;
         this.serverPort = serverPort;
@@ -38,16 +40,22 @@ final public class Client {
     }
 
     /**
-     * Ввод текста сообщения
+     * Ввод автора и текста сообщения
      */
-    public void start() {
+    private void start() {
         Scanner scanner = new Scanner(System.in);
         System.out.print("Введите автора: ");
         this.author = scanner.nextLine();
+
+        // Создание потока
+        Thread thread = new MyThread(this);
+
+        // Запуск потока
+        thread.start();
+
+        // Ввод текста сообщения
         while (true) {
-            System.out.print("Введите текст: ");
-            String text = scanner.nextLine();
-            this.sendMessage(text);
+            this.sendMessage(scanner.nextLine());
         }
     }
 
@@ -56,10 +64,15 @@ final public class Client {
      *
      * @param text текст сообщения
      */
-    private void sendMessage(final String text) {
-        Message message = new Message(this.author, text);
-        JSONObject jsonObject = new JSONObject(message);
-        byte[] input = jsonObject.toString().getBytes(StandardCharsets.UTF_8);
+    private void sendMessage(String text) {
+        ClientMessage clientMessage = new ClientMessage(this.author, text);
+        ObjectMapper objectMapper = new ObjectMapper();
+        byte[] input = new byte[0];
+        try {
+            input = objectMapper.writeValueAsString(clientMessage).getBytes(StandardCharsets.UTF_8);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
 
         URL url = null;
         try {
@@ -98,7 +111,61 @@ final public class Client {
             while ((responseLine = bufferedReader.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            System.out.println(response);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Отправка запроса для получения последнего сообщения
+     */
+    void getMessage() {
+        URL url = null;
+        try {
+            url = new URL(serverSchema + "://" + serverIP + ":" + serverPort + "/api/messages/get?message_id=" + maxMessageId);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        HttpURLConnection httpURLConnection = null;
+        try {
+            httpURLConnection = (HttpURLConnection) Objects.requireNonNull(url).openConnection();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Objects.requireNonNull(httpURLConnection).setRequestMethod("GET");
+        } catch (ProtocolException e) {
+            e.printStackTrace();
+        }
+
+        Objects.requireNonNull(httpURLConnection).setRequestProperty("Content-Type", "application/json; utf-8");
+        httpURLConnection.setDoOutput(true);
+
+        try (BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
+            StringBuilder response = new StringBuilder();
+            String responseLine;
+            while ((responseLine = bufferedReader.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            Message[] messages = objectMapper.readValue(Objects.requireNonNull(response.toString()), Message[].class);
+
+            // Получение последнего сообщения
+            if (messages.length != 0) {
+                int tempMaxId = 0;
+                for (Message message : messages) {
+                    if (message.getId() > tempMaxId) {
+                        tempMaxId = message.getId();
+                    }
+                    // Вывод последнего сообщения
+                    System.out.println(message);
+                }
+                maxMessageId = tempMaxId;
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }

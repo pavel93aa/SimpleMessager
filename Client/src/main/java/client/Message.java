@@ -1,30 +1,31 @@
 package client;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 /**
- * Класс описывающий сообщение
+ * Класс описывающий полное сообщение
  */
-final public class Message {
-    private final String author;
-    private final String text;
+final public class Message extends ClientMessage {
+    private int id;
+    private Date date;
 
-    public Message(final String author, final String text) {
-        this.author = author;
-        this.text = text;
+    public Message() {
     }
 
-    public String getAuthor() {
-        return author;
+    public int getId() {
+        return id;
     }
 
-    public String getText() {
-        return text;
+    public Date getDate() {
+        return date;
     }
 
     @Override
     public String toString() {
-        return "Message{" +
-                "author='" + author + '\'' +
-                ", text='" + text + '\'' +
-                '}';
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+        // Раскомментировать в случае надобности отображения времени в UTC
+        // simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return simpleDateFormat.format(date) + " " + getAuthor() + ": " + getText();
     }
 }

@@ -1,12 +1,13 @@
 package server;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -14,11 +15,12 @@ import java.util.*;
  */
 final public class Server {
     private final String serverPort;
-
     private static final List<Message> messages = new ArrayList<>();
-    private static int idCounter;
+    private static int messageIdCounter;
+    private final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
     public Server(String serverPort) {
+        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         this.serverPort = serverPort;
     }
 
@@ -76,7 +78,7 @@ final public class Server {
     /**
      * Запуск сервера
      */
-    public void start() {
+    private void start() {
         HttpServer httpServer = null;
         try {
             httpServer = HttpServer.create(new InetSocketAddress(Integer.parseInt(serverPort)), 0);
@@ -96,14 +98,24 @@ final public class Server {
 
             // Здесь было бы неплохо прикрутить валидацию полученного сообщения на соответствие json-формату
 
-            JSONObject jsonObject = new JSONObject(Objects.requireNonNull(request));
-            Message message = new Message(jsonObject, ++idCounter, new Date());
+            ObjectMapper objectMapper = new ObjectMapper();
+            ClientMessage clientMessage = objectMapper.readValue(request, ClientMessage.class);
+            Date date = null;
+            try {
+                date = simpleDateFormat.parse((simpleDateFormat.format(new Date())));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
 
-            // Добавление объекта Message в список
+            Message message = new Message(clientMessage, ++messageIdCounter, date);
+
+            // Добавление объекта Message в список сообщений
             messages.add(message);
 
-            jsonObject = new JSONObject(message);
-            String response = jsonObject.toString();
+            objectMapper.setDateFormat(simpleDateFormat);
+            String response = objectMapper.writeValueAsString(message);
+
+            // Вывод полученного сообщения
             System.out.println(response);
 
             try (OutputStream outputStream = httpExchange.getResponseBody()) {
@@ -116,13 +128,14 @@ final public class Server {
 
         // Обработчик получения сообщения (маршрут /api/messages/get)
         HttpHandler handlerOfGettingMessage = (httpExchange) -> {
-
             // Преобразование параметра запроса клиента в отображение
-            Map<String, String> params = Server.queryToMap(httpExchange.getRequestURI().getQuery());
-            System.out.println(params);
+            Map<String, String> clientRequestParameters = Server.queryToMap(httpExchange.getRequestURI().getQuery());
+
+            // Вывод параметров запроса клиента
+            System.out.println(clientRequestParameters);
 
             // Получение messageID из отображения
-            Integer messageId = Server.extractMessageId(params);
+            Integer messageId = Server.extractMessageId(clientRequestParameters);
 
             String response;
             int statusCode = 200;
@@ -134,13 +147,12 @@ final public class Server {
                 List<Message> newMessages = new ArrayList<>();
 
                 // Получение всех сообщений, id которых больше чем значение параметра message_id
-                for (Message message : messages) {
-                    if (messageId < message.getId()) newMessages.add(message);
-                }
+                for (Message message : messages) if (messageId < message.getId()) newMessages.add(message);
 
-                JSONArray jsonArray = new JSONArray(newMessages);
-                System.out.println(jsonArray);
-                response = jsonArray.toString();
+                ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.setDateFormat(simpleDateFormat);
+
+                response = objectMapper.writeValueAsString(newMessages);
             }
 
             try (OutputStream outputStream = httpExchange.getResponseBody()) {

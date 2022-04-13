@@ -1,31 +1,19 @@
 package server;
 
-import org.json.JSONObject;
-
 import java.util.Date;
 
 /**
- * Класс описывающий сообщение
+ * Класс описывающий полное сообщение
  */
-final public class Message {
-    private final String author;
-    private final String text;
+final public class Message extends ClientMessage {
     private final int id;
     private final Date date;
 
-    public Message(final JSONObject jsonObject, final int id, final Date date) {
-        this.author = String.valueOf(jsonObject.get("author"));
-        this.text = String.valueOf(jsonObject.get("text"));
+    public Message(ClientMessage clientsMessage, int id, Date date) {
+        super(clientsMessage.getAuthor(), clientsMessage.getText());
+
         this.id = id;
         this.date = date;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public String getText() {
-        return text;
     }
 
     public int getId() {
@@ -39,8 +27,8 @@ final public class Message {
     @Override
     public String toString() {
         return "Message{" +
-                "author='" + author + '\'' +
-                ", text='" + text + '\'' +
+                "author='" + getAuthor() + '\'' +
+                ", text='" + getText() + '\'' +
                 ", id=" + id +
                 ", date=" + date +
                 '}';
