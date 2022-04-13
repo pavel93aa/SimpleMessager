@@ -25,49 +25,6 @@ final public class Server {
     }
 
     /**
-     * Сохранение значений параметров key и value полученного клиентского запроса в отображение
-     *
-     * @param query строка формата key1=value1&keyN=valueN
-     * @return отображение со значениями параметров полученного клиентского запроса
-     */
-    private static Map<String, String> queryToMap(String query) {
-        if (query == null) return null;
-        Map<String, String> resultMap = new HashMap<>();
-        for (String param : query.split("&")) {
-            String[] entry = param.split("=");
-            if (entry.length > 1) resultMap.put(entry[0], entry[1]);
-            else resultMap.put(entry[0], "");
-        }
-        return resultMap;
-    }
-
-    /**
-     * Валидация и извлечение переданного клиентом параметра
-     *
-     * @param map переданные параметры пользователя в запросе
-     * @return id сообщения отправленного клиентом, после которого будут возвращены все сообщения
-     */
-    private static Integer extractMessageId(Map<String, String> map) {
-        // Проверка что ключ message_id есть
-        if (!map.containsKey("message_id")) return null;
-
-        // Нужна проверка, что параметр message_id должен быть только один в теле запроса
-
-        // Проверка, что тип целое число
-        int messageId;
-        try {
-            messageId = Integer.parseInt(map.get("message_id"));
-        } catch (NumberFormatException e) {
-            System.out.println("Значение параметра message_id - не число");
-            return null;
-        }
-
-        // Проверка, что число положительное
-        if (messageId < 0) return null;
-        return messageId;
-    }
-
-    /**
      * Точка входа в программу
      */
     public static void main(String[] args) {
@@ -169,5 +126,48 @@ final public class Server {
         httpServer.setExecutor(null); // По умолчанию один поток
         httpServer.start();
         System.out.println("Server started on port " + Integer.parseInt(serverPort));
+    }
+
+    /**
+     * Сохранение значений параметров key и value полученного клиентского запроса в отображение
+     *
+     * @param query строка формата key1=value1&keyN=valueN
+     * @return отображение со значениями параметров полученного клиентского запроса
+     */
+    private static Map<String, String> queryToMap(String query) {
+        if (query == null) return null;
+        Map<String, String> resultMap = new HashMap<>();
+        for (String param : query.split("&")) {
+            String[] entry = param.split("=");
+            if (entry.length > 1) resultMap.put(entry[0], entry[1]);
+            else resultMap.put(entry[0], "");
+        }
+        return resultMap;
+    }
+
+    /**
+     * Валидация и извлечение переданного клиентом параметра
+     *
+     * @param map переданные параметры пользователя в запросе
+     * @return id сообщения отправленного клиентом, после которого будут возвращены все сообщения
+     */
+    private static Integer extractMessageId(Map<String, String> map) {
+        // Проверка что ключ message_id есть
+        if (!map.containsKey("message_id")) return null;
+
+        // Нужна проверка, что параметр message_id должен быть только один в теле запроса
+
+        // Проверка, что тип целое число
+        int messageId;
+        try {
+            messageId = Integer.parseInt(map.get("message_id"));
+        } catch (NumberFormatException e) {
+            System.out.println("Значение параметра message_id - не число");
+            return null;
+        }
+
+        // Проверка, что число положительное
+        if (messageId < 0) return null;
+        return messageId;
     }
 }

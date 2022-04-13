@@ -104,16 +104,8 @@ final public class Client {
             e.printStackTrace();
         }
 
-        try (BufferedReader bufferedReader = new BufferedReader(
-                new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
-            StringBuilder response = new StringBuilder();
-            String responseLine;
-            while ((responseLine = bufferedReader.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // Получение ответа от сервера
+        getResponse(httpURLConnection);
     }
 
     /**
@@ -143,6 +135,35 @@ final public class Client {
         Objects.requireNonNull(httpURLConnection).setRequestProperty("Content-Type", "application/json; utf-8");
         httpURLConnection.setDoOutput(true);
 
+        ObjectMapper objectMapper = new ObjectMapper();
+        Message[] messages;
+        try {
+            messages = objectMapper.readValue(Objects.requireNonNull(getResponse(httpURLConnection)), Message[].class);
+        } catch (JsonProcessingException ex) {
+            throw new RuntimeException(ex);
+        }
+
+        // Получение последнего сообщения
+        if (messages.length != 0) {
+            int tempMaxId = 0;
+            for (Message message : messages) {
+                if (message.getId() > tempMaxId) {
+                    tempMaxId = message.getId();
+                }
+                // Вывод последнего сообщения
+                System.out.println(message);
+            }
+            maxMessageId = tempMaxId;
+        }
+    }
+
+    /**
+     * Получение ответа от сервера
+     *
+     * @param httpURLConnection объект соединения по сетевому протоколу НТТР
+     * @return ответ сервера
+     */
+    private static String getResponse(HttpURLConnection httpURLConnection) {
         try (BufferedReader bufferedReader = new BufferedReader(
                 new InputStreamReader(httpURLConnection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder response = new StringBuilder();
@@ -150,24 +171,9 @@ final public class Client {
             while ((responseLine = bufferedReader.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-
-            ObjectMapper objectMapper = new ObjectMapper();
-            Message[] messages = objectMapper.readValue(Objects.requireNonNull(response.toString()), Message[].class);
-
-            // Получение последнего сообщения
-            if (messages.length != 0) {
-                int tempMaxId = 0;
-                for (Message message : messages) {
-                    if (message.getId() > tempMaxId) {
-                        tempMaxId = message.getId();
-                    }
-                    // Вывод последнего сообщения
-                    System.out.println(message);
-                }
-                maxMessageId = tempMaxId;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+            return response.toString();
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
     }
 }
